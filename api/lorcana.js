@@ -4,7 +4,8 @@
 // Routes (via ?route= query param):
 //   ?route=cards               → LorcanaJSON allCards.json
 //   ?route=groups              → TCGCSV Lorcana set groups
-//   ?route=prices&groupId=NNN  → TCGCSV prices for a specific set group
+//   ?route=products&groupId=N  → TCGCSV product list for a set (name → productId mapping)
+//   ?route=prices&groupId=N    → TCGCSV prices for a specific set group
 
 const LORCANA_JSON_BASE = "https://lorcanajson.org/files/current/en";
 const TCGCSV_BASE       = "https://tcgcsv.com/tcgplayer/71";
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
 
   const { route, groupId } = req.query;
 
-  // ── CORS headers so the browser is happy ───────────────────────────────────
+  // ── CORS headers ───────────────────────────────────────────────────────────
   res.setHeader("Access-Control-Allow-Origin",  "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
@@ -37,6 +38,15 @@ export default async function handler(req, res) {
         upstreamUrl = `${TCGCSV_BASE}/groups`;
         break;
 
+      // NEW: fetch product list so App.jsx can join prices by card name
+      // when LorcanaJSON cards don't have a tcgPlayerId
+      case "products":
+        if (!groupId) {
+          return res.status(400).json({ error: "groupId is required for route=products" });
+        }
+        upstreamUrl = `${TCGCSV_BASE}/${groupId}/products`;
+        break;
+
       case "prices":
         if (!groupId) {
           return res.status(400).json({ error: "groupId is required for route=prices" });
@@ -45,12 +55,13 @@ export default async function handler(req, res) {
         break;
 
       default:
-        return res.status(400).json({ error: `Unknown route: "${route}". Use cards | groups | prices` });
+        return res.status(400).json({
+          error: `Unknown route: "${route}". Use cards | groups | products | prices`,
+        });
     }
 
     const upstream = await fetch(upstreamUrl, {
       headers: {
-        // Polite user-agent so LorcanaJSON knows who's calling
         "User-Agent": "LorcanaDeals/1.0 (lorcana-deals.vercel.app)",
         "Accept":     "application/json",
       },
@@ -65,7 +76,7 @@ export default async function handler(req, res) {
 
     const data = await upstream.json();
 
-    // Cache for 10 minutes on Vercel's CDN — keeps data fresh without hammering upstream
+    // Cache 10 min on Vercel CDN, serve stale for 60 s while revalidating
     res.setHeader("Cache-Control", "s-maxage=600, stale-while-revalidate=60");
     return res.status(200).json(data);
 
