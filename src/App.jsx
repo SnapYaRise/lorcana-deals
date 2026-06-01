@@ -11,7 +11,7 @@ const TITANTOYZ_REF  = "bjtmzqnp";  // Titan Toyz goaffpro ref code
 
 function tcgLink(tcgPlayerId, cardName = "") {
   if (tcgPlayerId) {
-    return `https://tcgplayer.sjv.io/c/${IMPACT_ID}/https://www.tcgplayer.com/product/${tcgPlayerId}`;
+    return `https://tcgplayer.sjv.io/c/${IMPACT_ID}/https://www.tcgplayer.com/product/${tcgPlayerId}?Language=English&Printing=Normal`;
   }
   const q = encodeURIComponent(`lorcana ${cardName}`);
   return `https://tcgplayer.sjv.io/c/${IMPACT_ID}/https://www.tcgplayer.com/search/lorcana/product?q=${q}`;
