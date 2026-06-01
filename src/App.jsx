@@ -44,12 +44,14 @@ async function fetchLorcanaCards() {
     id:          c.id,
     name:        c.name,
     fullName:    c.fullName || c.name,
-    // FIX: LorcanaJSON uses `inkColor`, not `color` — fall back through all variants
-    color:       c.inkColor || c.color || c.ink || null,
+    // `color` is confirmed correct per LorcanaJSON v2 logs
+    color:       c.color || c.inkColor || c.ink || null,
     rarity:      c.rarity,
-    setNumber:   c.setNumber ?? null,
+    // FIX 1: LorcanaJSON v2 uses `setCode` (string "1","2"…), not `setNumber`
+    setNumber:   c.setCode ? parseInt(c.setCode, 10) : (c.setNumber ?? null),
     images:      c.images || {},
-    tcgPlayerId: c.tcgPlayerId || null,
+    // FIX 2: tcgPlayerId is nested inside externalLinks, not top-level
+    tcgPlayerId: c.externalLinks?.tcgPlayerId || c.tcgPlayerId || null,
   }));
 }
 
@@ -433,7 +435,7 @@ export default function App() {
                     <div className="empty" style={{gridColumn:"1/-1"}}>
                       <h3>No cards found</h3>
                       {/* DEBUG hint visible on screen during development */}
-                      <p>Try a different filter. (activeSetNumber={String(activeSetNumber)}, cards={cards.length}, filtered={filtered.length})</p>
+                      <p>Try a different filter.</p>
                     </div>
                   )
                   : filtered.map(c => <CardTile key={c.id} c={c}/>)
