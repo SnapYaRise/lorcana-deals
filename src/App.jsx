@@ -1,5 +1,5 @@
 // src/App.jsx
-// LorcanaDeals — lorcana-deals.vercel.app
+// LorcanaVault — lorcana-deals.vercel.app
 // Data flows through /api/lorcana (Vercel serverless) to avoid CORS.
 
 import { useState, useEffect } from "react";
@@ -7,7 +7,7 @@ import { useState, useEffect } from "react";
 // ── Affiliate helpers ────────────────────────────────────────────────────────
 const IMPACT_ID      = "YOUR_IMPACT_ID";       // ← replace once Impact approves you
 const AMAZON_TAG     = "YOUR_AMAZON_TAG-20";   // ← replace with your Associates tag
-const TITANTOYZ_REF  = "bjtmzqnp";  // Titan Toyz goaffpro ref code
+const TITANTOYZ_REF  = "bjtmzqnp";            // Titan Toyz goaffpro ref code
 
 function tcgLink(tcgPlayerId, cardName = "") {
   if (tcgPlayerId) {
@@ -22,7 +22,6 @@ function amzLink(query) {
 }
 
 function titanLink(path) {
-  // Titan Toyz affiliate: append ?ref=bjtmzqnp to every product URL
   return `https://titantoyz.com${path}?ref=${TITANTOYZ_REF}`;
 }
 
@@ -63,7 +62,6 @@ async function fetchPricesForGroup(groupId) {
 
   const byId = {};
   for (const r of priceList) {
-    // Keep only Normal subtype to avoid foil duplicates inflating byId
     if (!r.subTypeName || r.subTypeName === "Normal") {
       byId[r.productId] = { low: r.lowPrice, market: r.marketPrice, mid: r.midPrice };
     }
@@ -76,7 +74,7 @@ async function fetchPricesForGroup(groupId) {
   return { byId, byName };
 }
 
-// ── Price lookup helper ──────────────────────────────────────────────────────
+// ── Price lookup ─────────────────────────────────────────────────────────────
 function getPrice(allPrices, card) {
   if (!allPrices) return null;
   if (card.tcgPlayerId && allPrices.byId?.[card.tcgPlayerId]) {
@@ -93,6 +91,14 @@ function getPrice(allPrices, card) {
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INK_COLORS = ["all","Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
+
+// Treasures tab rarity tiers, in display order
+const TREASURE_TIERS = [
+  { key: "Enchanted",   label: "✨ Enchanted",   color: "#f0abfc" },
+  { key: "Legendary",   label: "⚜ Legendary",   color: "#fbbf24" },
+  { key: "Super Rare",  label: "★★ Super Rare",  color: "#38bdf8" },
+  { key: "Rare",        label: "★ Rare",          color: "#34d399" },
+];
 
 const SET_NAME_TO_NUMBER = {
   "first chapter":         1,
@@ -114,108 +120,32 @@ function setNumberFromGroup(groupName) {
   return null;
 }
 
-// Strip "Disney Lorcana" / "Disney Lorcana TCG" prefix for cleaner dropdown
 function cleanGroupName(name) {
   return name.replace(/^Disney Lorcana(?: TCG)?[:\s]*/i, "").trim();
 }
 
 // ── Sealed product data ──────────────────────────────────────────────────────
-// TCGplayer sealed (English booster boxes)
 const TCG_SEALED = [
-  { name:"The First Chapter Booster Box",     set:1, tcg:tcgLink(null,"Lorcana First Chapter Booster Box"),     amz:amzLink("Disney Lorcana First Chapter Booster Box") },
-  { name:"Rise of the Floodborn Booster Box", set:2, tcg:tcgLink(null,"Lorcana Rise Floodborn Booster Box"),    amz:amzLink("Disney Lorcana Rise of the Floodborn Booster Box") },
-  { name:"Into the Inklands Booster Box",     set:3, tcg:tcgLink(null,"Lorcana Into Inklands Booster Box"),     amz:amzLink("Disney Lorcana Into the Inklands Booster Box") },
-  { name:"Ursula's Return Booster Box",       set:4, tcg:tcgLink(null,"Lorcana Ursulas Return Booster Box"),    amz:amzLink("Disney Lorcana Ursula's Return Booster Box") },
-  { name:"Shimmering Skies Booster Box",      set:5, tcg:tcgLink(null,"Lorcana Shimmering Skies Booster Box"),  amz:amzLink("Disney Lorcana Shimmering Skies Booster Box") },
-  { name:"Azurite Sea Booster Box",           set:6, tcg:tcgLink(null,"Lorcana Azurite Sea Booster Box"),       amz:amzLink("Disney Lorcana Azurite Sea Booster Box") },
-  { name:"Archazia's Island Booster Box",     set:7, tcg:tcgLink(null,"Lorcana Archazia Island Booster Box"),   amz:amzLink("Disney Lorcana Archazia Island Booster Box") },
+  { name:"The First Chapter Booster Box",     set:1, tcg:tcgLink(null,"Lorcana First Chapter Booster Box"),    amz:amzLink("Disney Lorcana First Chapter Booster Box") },
+  { name:"Rise of the Floodborn Booster Box", set:2, tcg:tcgLink(null,"Lorcana Rise Floodborn Booster Box"),   amz:amzLink("Disney Lorcana Rise of the Floodborn Booster Box") },
+  { name:"Into the Inklands Booster Box",     set:3, tcg:tcgLink(null,"Lorcana Into Inklands Booster Box"),    amz:amzLink("Disney Lorcana Into the Inklands Booster Box") },
+  { name:"Ursula's Return Booster Box",       set:4, tcg:tcgLink(null,"Lorcana Ursulas Return Booster Box"),   amz:amzLink("Disney Lorcana Ursula's Return Booster Box") },
+  { name:"Shimmering Skies Booster Box",      set:5, tcg:tcgLink(null,"Lorcana Shimmering Skies Booster Box"), amz:amzLink("Disney Lorcana Shimmering Skies Booster Box") },
+  { name:"Azurite Sea Booster Box",           set:6, tcg:tcgLink(null,"Lorcana Azurite Sea Booster Box"),      amz:amzLink("Disney Lorcana Azurite Sea Booster Box") },
+  { name:"Archazia's Island Booster Box",     set:7, tcg:tcgLink(null,"Lorcana Archazia Island Booster Box"),  amz:amzLink("Disney Lorcana Archazia Island Booster Box") },
 ];
 
-// Titan Toyz sealed — only in-stock or pre-order products (no sold-out)
 const TITAN_SEALED = [
-  {
-    name: "Set 8: Reign of Jafar Booster Box",
-    badge: "Pre-Order",
-    price: "$179.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-set-8-reign-of-jafar-booster"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-07T195101.876.jpg",
-  },
-  {
-    name: "Set 8: Reign of Jafar Trove",
-    badge: "Pre-Order",
-    price: "$59.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-set-8-reign-of-jafar-trove"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-07T194725.960.jpg",
-  },
-  {
-    name: "Japanese Ver. — The First Chapter Box (16 packs)",
-    badge: "In Stock",
-    price: "$89.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-the-first-chapter-16packs-box"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitled_design_75.jpg",
-  },
-  {
-    name: "Japanese Ver. — Rise of the Floodborn Box (16 packs)",
-    badge: "In Stock",
-    price: "$75.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-rise-of-the-floodborn-16packs-box"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitled_design_-_2025-03-21T085715.855.jpg",
-  },
-  {
-    name: "Japanese Ver. — Into the Inklands Box",
-    badge: "Sale",
-    price: "$29.99 CAD",
-    originalPrice: "$59.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-into-the-inklands-box-1"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-10T232536.820.jpg",
-  },
-  {
-    name: "Japanese Ver. — Ursula's Return Box",
-    badge: "Pre-Order",
-    price: "$59.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-ursulas-return-box"),
-    img: "https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-05-12T095505.927.jpg",
-  },
-  {
-    name: "Japanese Ver. — Starter Deck Rise of Floodborn (Amethyst & Steel)",
-    badge: "Pre-Order",
-    price: "$29.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-rise-of-the-floodborn-16packs-box-copy"),
-    img: "https://titantoyz.com/cdn/shop/files/lorcana.png",
-  },
-  {
-    name: "Japanese Ver. — Starter Deck Rise of Floodborn (Amber & Sapphire)",
-    badge: "Pre-Order",
-    price: "$29.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-rise-of-the-floodborn-amber-sapphire"),
-    img: "https://titantoyz.com/cdn/shop/files/lorcana.png",
-  },
-  {
-    name: "Japanese Ver. — Starter Deck Into the Inklands (Amber & Emerald)",
-    badge: "Sale",
-    price: "$10.99 CAD",
-    originalPrice: "$25.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-into-the-inklands-amber-emerald"),
-    img: "https://titantoyz.com/cdn/shop/files/disney-lorcana-logo.jpg",
-  },
-  {
-    name: "Japanese Ver. — Starter Deck Into the Inklands (Ruby & Sapphire)",
-    badge: "Sale",
-    price: "$10.99 CAD",
-    originalPrice: "$25.99 CAD",
-    inStock: true,
-    url: titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-into-the-inklands-ruby-sapphire"),
-    img: "https://titantoyz.com/cdn/shop/files/disney-lorcana-logo.jpg",
-  },
+  { name:"Set 8: Reign of Jafar Booster Box",                          badge:"Pre-Order", price:"$179.99 CAD", url:titanLink("/products/disney-lorcana-set-8-reign-of-jafar-booster"),                                                          img:"https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-07T195101.876.jpg" },
+  { name:"Set 8: Reign of Jafar Trove",                                badge:"Pre-Order", price:"$59.99 CAD",  url:titanLink("/products/disney-lorcana-set-8-reign-of-jafar-trove"),                                                             img:"https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-07T194725.960.jpg" },
+  { name:"Japanese Ver. — The First Chapter Box (16 packs)",           badge:"In Stock",  price:"$89.99 CAD",  url:titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-the-first-chapter-16packs-box"),                             img:"https://titantoyz.com/cdn/shop/files/Untitled_design_75.jpg" },
+  { name:"Japanese Ver. — Rise of the Floodborn Box (16 packs)",       badge:"In Stock",  price:"$75.99 CAD",  url:titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-rise-of-the-floodborn-16packs-box"),                         img:"https://titantoyz.com/cdn/shop/files/Untitled_design_-_2025-03-21T085715.855.jpg" },
+  { name:"Japanese Ver. — Into the Inklands Box",                      badge:"Sale",      price:"$29.99 CAD",  originalPrice:"$59.99 CAD", url:titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-into-the-inklands-box-1"),       img:"https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-04-10T232536.820.jpg" },
+  { name:"Japanese Ver. — Ursula's Return Box",                        badge:"Pre-Order", price:"$59.99 CAD",  url:titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-ursulas-return-box"),                                        img:"https://titantoyz.com/cdn/shop/files/Untitleddesign-2025-05-12T095505.927.jpg" },
+  { name:"Japanese Ver. — Starter Deck Floodborn (Amethyst & Steel)",  badge:"Pre-Order", price:"$29.99 CAD",  url:titanLink("/products/disney-lorcana-tcg-japanese-ver-booster-pack-rise-of-the-floodborn-16packs-box-copy"),                    img:"https://titantoyz.com/cdn/shop/files/lorcana.png" },
+  { name:"Japanese Ver. — Starter Deck Floodborn (Amber & Sapphire)",  badge:"Pre-Order", price:"$29.99 CAD",  url:titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-rise-of-the-floodborn-amber-sapphire"),                      img:"https://titantoyz.com/cdn/shop/files/lorcana.png" },
+  { name:"Japanese Ver. — Starter Deck Inklands (Amber & Emerald)",    badge:"Sale",      price:"$10.99 CAD",  originalPrice:"$25.99 CAD", url:titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-into-the-inklands-amber-emerald"), img:"https://titantoyz.com/cdn/shop/files/disney-lorcana-logo.jpg" },
+  { name:"Japanese Ver. — Starter Deck Inklands (Ruby & Sapphire)",    badge:"Sale",      price:"$10.99 CAD",  originalPrice:"$25.99 CAD", url:titanLink("/products/disney-lorcana-tcg-japanese-ver-starter-deck-into-the-inklands-ruby-sapphire"),  img:"https://titantoyz.com/cdn/shop/files/disney-lorcana-logo.jpg" },
 ];
 
 // ── Styles ───────────────────────────────────────────────────────────────────
@@ -255,15 +185,22 @@ const styles = `
   .nav-tab.active { background: var(--accent); color: #fff; }
 
   .hero {
-    text-align: center; padding: 3.5rem 1rem 2rem;
+    text-align: center; padding: 3rem 1rem 1.75rem;
     background: radial-gradient(ellipse 70% 40% at 50% 0%, rgba(192,132,252,.12) 0%, transparent 70%);
   }
   .hero-eyebrow { font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: .6rem; }
-  .hero h1 { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 900; line-height: 1.1; }
-  .hero p  { color: var(--muted); margin-top: .75rem; font-size: 1.05rem; }
-  .status-bar { margin-top: 1rem; display: flex; justify-content: center; gap: 1rem; font-size: .78rem; color: var(--muted); }
+  .hero h1 { font-size: clamp(1.8rem, 4vw, 2.8rem); font-weight: 900; line-height: 1.1; }
+  .hero p  { color: var(--muted); margin-top: .6rem; font-size: 1rem; }
+  .hero-disclaimer {
+    margin: .75rem auto 0; max-width: 560px;
+    background: rgba(192,132,252,.06); border: 1px solid rgba(192,132,252,.15);
+    border-radius: 8px; padding: .55rem .9rem; font-size: .75rem; color: var(--muted); line-height: 1.5;
+  }
+  .hero-disclaimer a { color: var(--accent); text-decoration: none; }
+  .status-bar { margin-top: .75rem; display: flex; justify-content: center; gap: 1rem; font-size: .78rem; color: var(--muted); }
   .status-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--success); margin-right: .35rem; }
 
+  /* ── Filters ── */
   .filters {
     display: flex; flex-wrap: wrap; gap: .5rem;
     padding: 1rem 1.5rem; border-bottom: 1px solid var(--border); align-items: center;
@@ -281,6 +218,7 @@ const styles = `
     border-radius: 8px; padding: .3rem .65rem; font-size: .8rem; cursor: pointer; outline: none;
   }
 
+  /* ── Card grid ── */
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem 1.5rem 3rem; }
 
   .card {
@@ -303,9 +241,9 @@ const styles = `
   .tag-sapphire { background: rgba(56,189,248,.15);  color: #38bdf8; }
   .tag-steel    { background: rgba(148,163,184,.15); color: #94a3b8; }
   .tag-rarity   { background: var(--surface); color: var(--muted); }
-  .card-price { margin-top: auto; padding-top: .5rem; border-top: 1px solid var(--border); display: flex; align-items: baseline; gap: .4rem; }
+  .card-price { margin-top: auto; padding-top: .5rem; border-top: 1px solid var(--border); }
   .price-main { font-size: 1.1rem; font-weight: 800; color: var(--accent); }
-  .price-low  { font-size: .72rem; color: var(--muted); }
+  .price-sub  { font-size: .7rem; color: var(--muted); margin-top: .1rem; }
   .price-none { font-size: .75rem; color: var(--muted); font-style: italic; }
   .card-actions { display: flex; gap: .4rem; padding: .6rem .75rem .75rem; }
   .btn {
@@ -321,6 +259,15 @@ const styles = `
   @keyframes shimmer { to { background-position: -200% 0; } }
   .skeleton-card { height: 320px; }
 
+  /* ── Treasures tab ── */
+  .tier-section { padding: 0 1.5rem 2rem; }
+  .tier-header {
+    font-size: .82rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+    padding: 1.25rem 0 .75rem; display: flex; align-items: center; gap: .65rem;
+  }
+  .tier-header::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+  .tier-loading { padding: 3rem 1.5rem; text-align: center; color: var(--muted); font-size: .85rem; }
+
   /* ── Sealed tab ── */
   .sealed-section { padding: 1.25rem 1.5rem 0; }
   .sealed-section-title {
@@ -329,44 +276,25 @@ const styles = `
   }
   .sealed-section-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
   .sealed-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.1rem; margin-bottom: 2rem; }
-
   .sealed-card {
     background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
     overflow: hidden; display: flex; flex-direction: column;
     transition: transform .18s, border-color .18s;
   }
-  .sealed-card:hover { transform: translateY(-3px); border-color: var(--accent2); }
+  .sealed-card:hover       { transform: translateY(-3px); border-color: var(--accent2); }
   .sealed-card.titan:hover { border-color: var(--titan); }
-
-  .sealed-img {
-    height: 150px; background: var(--surface); display: flex; align-items: center; justify-content: center;
-    font-size: 3rem; overflow: hidden;
-  }
+  .sealed-img { height: 150px; background: var(--surface); display: flex; align-items: center; justify-content: center; font-size: 3rem; overflow: hidden; }
   .sealed-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
   .sealed-body { padding: .85rem; flex: 1; display: flex; flex-direction: column; gap: .3rem; }
   .sealed-name { font-weight: 700; font-size: .88rem; line-height: 1.3; }
-  .sealed-meta { display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem; }
+  .sealed-meta { display: flex; align-items: center; gap: .4rem; margin-bottom: .4rem; flex-wrap: wrap; }
   .sealed-price { font-size: 1rem; font-weight: 800; color: var(--accent2); }
   .sealed-price-orig { font-size: .75rem; color: var(--muted); text-decoration: line-through; }
-  .sealed-badge {
-    font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
-    padding: .15rem .4rem; border-radius: 4px;
-  }
-  .badge-preorder  { background: rgba(56,189,248,.15);  color: var(--accent2); }
-  .badge-instock   { background: rgba(52,211,153,.15);  color: var(--success); }
-  .badge-sale      { background: rgba(251,191,36,.15);  color: var(--gold); }
+  .sealed-badge { font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; padding: .15rem .4rem; border-radius: 4px; }
+  .badge-preorder { background: rgba(56,189,248,.15);  color: var(--accent2); }
+  .badge-instock  { background: rgba(52,211,153,.15);  color: var(--success); }
+  .badge-sale     { background: rgba(251,191,36,.15);  color: var(--gold); }
   .sealed-btns { display: flex; flex-direction: column; gap: .4rem; margin-top: auto; }
-
-  /* ── Deals tab ── */
-  .deals-toolbar {
-    padding: 1rem 1.5rem .5rem; display: flex; align-items: center; gap: .75rem;
-    color: var(--muted); font-size: .82rem; flex-wrap: wrap;
-  }
-  .deals-loading-bar { padding: 1rem 1.5rem; color: var(--muted); font-size: .82rem; }
-  .deals-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; padding: .5rem 1.5rem 3rem; }
-  .deal-badge { background: var(--success); color: #000; font-size: .65rem; font-weight: 800; padding: .15rem .45rem; border-radius: 4px; text-transform: uppercase; letter-spacing: .05em; }
-  .deal-savings { font-size: .7rem; color: var(--success); font-weight: 700; }
 
   .empty { text-align: center; padding: 4rem 1rem; color: var(--muted); }
   .empty h3 { font-size: 1.1rem; margin-bottom: .5rem; }
@@ -390,19 +318,19 @@ function badgeClass(b) {
 
 // ── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [tab,        setTab]        = useState("singles");
+  const [tab,        setTab]        = useState("treasures");
   const [groups,     setGroups]     = useState([]);
   const [activeSet,  setActiveSet]  = useState(null);
   const [cards,      setCards]      = useState([]);
 
-  // Singles: prices for the active set only
+  // Singles tab prices (active set only)
   const [prices,     setPrices]     = useState({ byId: {}, byName: {} });
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
 
-  // Deals: merged prices across ALL sets
-  const [allPrices,    setAllPrices]    = useState(null);   // null = not yet fetched
-  const [dealsLoading, setDealsLoading] = useState(false);
+  // Treasures tab: merged prices across all sets
+  const [allPrices,      setAllPrices]      = useState(null);
+  const [treasuresLoading, setTreasuresLoading] = useState(false);
 
   const [activeInk,  setActiveInk]  = useState("all");
   const [search,     setSearch]     = useState("");
@@ -425,7 +353,7 @@ export default function App() {
       .catch(() => setCards(PLACEHOLDER_CARDS));
   }, []);
 
-  // ── Load prices for the active set (Singles tab) ─────────────────────────
+  // ── Load prices for Singles tab (active set) ─────────────────────────────
   useEffect(() => {
     if (!activeSet?.groupId) return;
     setLoading(true);
@@ -435,32 +363,28 @@ export default function App() {
       .catch(() => { setPrices({ byId: {}, byName: {} }); setLoading(false); setError("Could not load prices for this set."); });
   }, [activeSet]);
 
-  // ── Fetch ALL set prices when Deals tab is first opened ──────────────────
+  // ── Fetch ALL set prices when Treasures tab first opened ─────────────────
   useEffect(() => {
-    if (tab !== "deals" || allPrices !== null || groups.length === 0) return;
-
-    setDealsLoading(true);
-    // Only fetch main sets (exclude promo/special groups)
+    if (tab !== "treasures" || allPrices !== null || groups.length === 0) return;
+    setTreasuresLoading(true);
     const mainGroups = groups.filter(g => {
       const lower = g.name.toLowerCase();
       return !lower.includes("promo") && !lower.includes("special") && setNumberFromGroup(g.name) !== null;
     });
-
     Promise.all(mainGroups.map(g => fetchPricesForGroup(g.groupId)))
       .then(results => {
-        // Merge all byId and byName maps into one
         const merged = { byId: {}, byName: {} };
         for (const r of results) {
           Object.assign(merged.byId,   r.byId);
           Object.assign(merged.byName, r.byName);
         }
         setAllPrices(merged);
-        setDealsLoading(false);
+        setTreasuresLoading(false);
       })
-      .catch(() => setDealsLoading(false));
+      .catch(() => setTreasuresLoading(false));
   }, [tab, groups, allPrices]);
 
-  // ── Filter cards for Singles tab ─────────────────────────────────────────
+  // ── Singles filter ───────────────────────────────────────────────────────
   const activeSetNumber = setNumberFromGroup(activeSet?.name);
   const filtered = cards.filter(c => {
     const matchSet    = activeSetNumber === null || c.setNumber === activeSetNumber;
@@ -469,21 +393,24 @@ export default function App() {
     return matchSet && matchInk && matchSearch;
   }).slice(0, 48);
 
-  // ── Deals: all cards with a price, sorted by market price descending ─────
-  const deals = allPrices
-    ? cards
-        .map(c => ({ c, p: getPrice(allPrices, c) }))
-        .filter(({ p }) => p && p.market && p.low && p.low <= p.market * 0.90)
-        .sort((a, b) => (b.p.market || 0) - (a.p.market || 0))
-        .slice(0, 48)
-    : [];
+  // ── Treasures: group by rarity tier, sort by price desc within each ──────
+  const treasuresByTier = TREASURE_TIERS.map(tier => ({
+    ...tier,
+    cards: allPrices
+      ? cards
+          .filter(c => c.rarity === tier.key)
+          .map(c => ({ c, p: getPrice(allPrices, c) }))
+          .filter(({ p }) => p && p.market)
+          .sort((a, b) => (b.p.market || 0) - (a.p.market || 0))
+          .slice(0, 24)
+      : [],
+  }));
 
   const withPrices = Object.keys(prices.byId).length;
 
   // ── Card tile ────────────────────────────────────────────────────────────
-  function CardTile({ c, p, badge }) {
+  function CardTile({ c, p }) {
     const img = c.images?.full || c.images?.thumbnail;
-    const savings = p && p.market && p.low ? Math.round((1 - p.low / p.market) * 100) : null;
     return (
       <div className="card">
         <div className="card-img-wrap">
@@ -495,21 +422,19 @@ export default function App() {
             {inkTag(c.color)}
             <span className="tag tag-rarity">{rarityIcon(c.rarity)} {c.rarity}</span>
           </div>
-          {badge && (
-            <div style={{display:"flex", gap:".35rem", alignItems:"center"}}>
-              <span className="deal-badge">🔥 Deal</span>
-              {savings && <span className="deal-savings">−{savings}% vs market</span>}
-            </div>
-          )}
           <div className="card-price">
-            {p
-              ? <><span className="price-main">${p.market?.toFixed(2) ?? "—"}</span>{p.low && <span className="price-low">Low ${p.low.toFixed(2)}</span>}</>
-              : <span className="price-none">Price unavailable</span>
-            }
+            {p ? (
+              <>
+                <div><span className="price-main">${p.market?.toFixed(2) ?? "—"}</span></div>
+                <div className="price-sub">TCGplayer market avg · Low ${p.low?.toFixed(2) ?? "—"}</div>
+              </>
+            ) : (
+              <span className="price-none">Price unavailable</span>
+            )}
           </div>
         </div>
         <div className="card-actions">
-          <a className="btn btn-primary" href={tcgLink(c.tcgPlayerId, c.name)} target="_blank" rel="noopener noreferrer">TCGplayer</a>
+          <a className="btn btn-primary" href={tcgLink(c.tcgPlayerId, c.name)} target="_blank" rel="noopener noreferrer">View on TCGplayer</a>
         </div>
       </div>
     );
@@ -520,22 +445,26 @@ export default function App() {
       <style>{styles}</style>
       <div className="app">
         <header className="header">
-          <div className="logo">Lorcana<span>Deals</span></div>
+          <div className="logo">Lorcana<span>Vault</span></div>
           <div className="search-bar">
             <span className="search-icon">🔍</span>
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search cards…" />
           </div>
           <nav className="nav-tabs">
-            {[["singles","Singles"],["sealed","Sealed"],["deals","🔥 Deals"]].map(([id,label]) => (
+            {[["treasures","💎 Treasures"],["packs","Packs"],["singles","Singles"]].map(([id,label]) => (
               <button key={id} className={`nav-tab ${tab===id?"active":""}`} onClick={() => setTab(id)}>{label}</button>
             ))}
           </nav>
         </header>
 
         <div className="hero">
-          <div className="hero-eyebrow">✨ Live Price Tracking</div>
-          <h1>Find the Best<br />Lorcana Deals</h1>
-          <p>Real-time prices for singles and sealed product.</p>
+          <div className="hero-eyebrow">🏛 Lorcana Card Price Guide</div>
+          <h1>LorcanaVault</h1>
+          <p>Track market values for every Disney Lorcana card.</p>
+          <div className="hero-disclaimer">
+            💡 Prices shown are <strong>TCGplayer market averages</strong> sourced from <a href="https://tcgcsv.com" target="_blank" rel="noopener noreferrer">TCGCSV</a>, updated daily.
+            They reflect recent sale prices — not live listings. Click any card to see current listings on TCGplayer.
+          </div>
           <div className="status-bar">
             <span><span className="status-dot"/>LorcanaJSON · TCGCSV</span>
             <span>{cards.length.toLocaleString()} cards · {withPrices.toLocaleString()} priced</span>
@@ -544,39 +473,28 @@ export default function App() {
 
         {error && <div className="error-bar">⚠ {error}</div>}
 
-        {/* ── Singles ── */}
-        {tab === "singles" && (
-          <>
-            <div className="filters">
-              <span className="filter-label">Set</span>
-              <select className="set-select" value={activeSet?.groupId || ""}
-                onChange={e => { const g = groups.find(x => String(x.groupId) === e.target.value); if (g) setActiveSet(g); }}>
-                {groups.length === 0 && <option>Loading…</option>}
-                {groups.map(g => <option key={g.groupId} value={g.groupId}>{cleanGroupName(g.name)}</option>)}
-              </select>
-              <span className="filter-label" style={{marginLeft:".75rem"}}>Ink</span>
-              {INK_COLORS.map(ink => (
-                <button key={ink} className={`filter-btn ${activeInk===ink?"active":""}`} onClick={() => setActiveInk(ink)}>
-                  {ink === "all" ? "All" : ink}
-                </button>
-              ))}
-            </div>
-            <div className="grid">
-              {loading
-                ? Array.from({length:12}).map((_,i) => <div key={i} className="skeleton skeleton-card"/>)
-                : filtered.length === 0
-                  ? <div className="empty" style={{gridColumn:"1/-1"}}><h3>No cards found</h3><p>Try a different filter.</p></div>
-                  : filtered.map(c => <CardTile key={c.id} c={c} p={getPrice(prices, c)} />)
-              }
-            </div>
-          </>
+        {/* ── Treasures ── */}
+        {tab === "treasures" && (
+          treasuresLoading
+            ? <div className="tier-loading">⏳ Loading prices across all sets…</div>
+            : <div>
+                {treasuresByTier.map(tier => (
+                  <div className="tier-section" key={tier.key}>
+                    <div className="tier-header" style={{color: tier.color}}>{tier.label}</div>
+                    {tier.cards.length === 0
+                      ? <div style={{color:"var(--muted)", fontSize:".82rem", paddingBottom:"1rem"}}>No priced cards found.</div>
+                      : <div className="grid" style={{padding:0}}>
+                          {tier.cards.map(({c, p}) => <CardTile key={c.id} c={c} p={p} />)}
+                        </div>
+                    }
+                  </div>
+                ))}
+              </div>
         )}
 
-        {/* ── Sealed ── */}
-        {tab === "sealed" && (
+        {/* ── Packs ── */}
+        {tab === "packs" && (
           <div style={{paddingBottom:"3rem"}}>
-
-            {/* TCGplayer section */}
             <div className="sealed-section">
               <div className="sealed-section-title">TCGplayer — English Booster Boxes</div>
               <div className="sealed-grid">
@@ -595,7 +513,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Titan Toyz section */}
             <div className="sealed-section">
               <div className="sealed-section-title">Titan Toyz — Canadian Retailer 🇨🇦</div>
               <div style={{
@@ -626,28 +543,40 @@ export default function App() {
                 ))}
               </div>
             </div>
-
           </div>
         )}
 
-        {/* ── Deals ── */}
-        {tab === "deals" && (
+        {/* ── Singles ── */}
+        {tab === "singles" && (
           <>
-            <div className="deals-toolbar">
-              <span>Cards where the lowest listing is ≥10% below market price, sorted by most valuable first.</span>
+            <div className="filters">
+              <span className="filter-label">Set</span>
+              <select className="set-select" value={activeSet?.groupId || ""}
+                onChange={e => { const g = groups.find(x => String(x.groupId) === e.target.value); if (g) setActiveSet(g); }}>
+                {groups.length === 0 && <option>Loading…</option>}
+                {groups.map(g => <option key={g.groupId} value={g.groupId}>{cleanGroupName(g.name)}</option>)}
+              </select>
+              <span className="filter-label" style={{marginLeft:".75rem"}}>Ink</span>
+              {INK_COLORS.map(ink => (
+                <button key={ink} className={`filter-btn ${activeInk===ink?"active":""}`} onClick={() => setActiveInk(ink)}>
+                  {ink === "all" ? "All" : ink}
+                </button>
+              ))}
             </div>
-            {dealsLoading
-              ? <div className="deals-loading-bar">⏳ Loading prices across all sets…</div>
-              : deals.length === 0
-                ? <div className="empty"><h3>No deals right now</h3><p>Check back soon.</p></div>
-                : <div className="deals-grid">{deals.map(({c, p}) => <CardTile key={c.id} c={c} p={p} badge />)}</div>
-            }
+            <div className="grid">
+              {loading
+                ? Array.from({length:12}).map((_,i) => <div key={i} className="skeleton skeleton-card"/>)
+                : filtered.length === 0
+                  ? <div className="empty" style={{gridColumn:"1/-1"}}><h3>No cards found</h3><p>Try a different filter.</p></div>
+                  : filtered.map(c => <CardTile key={c.id} c={c} p={getPrice(prices, c)} />)
+              }
+            </div>
           </>
         )}
 
         <footer className="footer">
           <p>
-            LorcanaDeals is not affiliated with Ravensburger or Disney. &nbsp;·&nbsp;
+            LorcanaVault is not affiliated with Ravensburger or Disney. &nbsp;·&nbsp;
             Prices via <a href="https://tcgcsv.com" target="_blank" rel="noopener noreferrer">TCGCSV</a> &nbsp;·&nbsp;
             Card data via <a href="https://lorcanajson.org" target="_blank" rel="noopener noreferrer">LorcanaJSON</a>
           </p>
