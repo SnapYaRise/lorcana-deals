@@ -7,7 +7,7 @@
 //   ?route=prices&groupId=NNN  → TCGCSV prices for a specific set group
 
 const LORCANA_JSON_BASE = "https://lorcanajson.org/files/current/en";
-const TCGCSV_BASE       = "https://tcgcsv.com/tcgplayer/68";
+const TCGCSV_BASE       = "https://tcgcsv.com/tcgplayer/71";
 
 export default async function handler(req, res) {
   // Allow GET only
