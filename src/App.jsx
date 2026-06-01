@@ -33,42 +33,92 @@ async function fetchLorcanaCards() {
   if (!res.ok) throw new Error(`cards ${res.status}`);
   const json = await res.json();
   const raw = Array.isArray(json) ? json : (json.cards || json.data || []);
+
+  // DEBUG: log first card so you can confirm field names in DevTools Console
+  if (raw.length > 0) {
+    console.log("🃏 LorcanaJSON sample card — field names:", Object.keys(raw[0]));
+    console.log("🃏 LorcanaJSON sample card — values:", raw[0]);
+  }
+
   return raw.map(c => ({
     id:          c.id,
     name:        c.name,
     fullName:    c.fullName || c.name,
-    color:       c.color,
+    // FIX: LorcanaJSON uses `inkColor`, not `color` — fall back through all variants
+    color:       c.inkColor || c.color || c.ink || null,
     rarity:      c.rarity,
-    setNumber:   c.setNumber,   // 1 = First Chapter, 2 = Rise of Floodborn, etc.
+    setNumber:   c.setNumber ?? null,
     images:      c.images || {},
     tcgPlayerId: c.tcgPlayerId || null,
   }));
 }
 
+// FIX: fetch both prices AND products so we can join by name when tcgPlayerId is absent
 async function fetchPrices(groupId) {
-  const res = await fetch(`/api/lorcana?route=prices&groupId=${groupId}`);
-  if (!res.ok) throw new Error(`prices ${res.status}`);
-  const json = await res.json();
-  const map = {};
-  for (const r of (json.results || [])) {
-    map[r.productId] = { low: r.lowPrice, market: r.marketPrice, mid: r.midPrice };
+  const [priceRes, productRes] = await Promise.all([
+    fetch(`/api/lorcana?route=prices&groupId=${groupId}`),
+    fetch(`/api/lorcana?route=products&groupId=${groupId}`),
+  ]);
+
+  if (!priceRes.ok)   throw new Error(`prices ${priceRes.status}`);
+  if (!productRes.ok) throw new Error(`products ${productRes.status}`);
+
+  const priceJson   = await priceRes.json();
+  const productJson = await productRes.json();
+
+  const priceList   = priceJson.results   || [];
+  const productList = productJson.results  || [];
+
+  // DEBUG
+  if (priceList.length > 0)   console.log("💰 Sample price row:",   priceList[0]);
+  if (productList.length > 0) console.log("📦 Sample product row:", productList[0]);
+
+  // Build productId → price lookup
+  const byId = {};
+  for (const r of priceList) {
+    byId[r.productId] = { low: r.lowPrice, market: r.marketPrice, mid: r.midPrice };
   }
-  return map;
+
+  // Build normalised product name → price lookup (fallback when tcgPlayerId missing)
+  const byName = {};
+  for (const p of productList) {
+    const price = byId[p.productId];
+    if (price) byName[p.name.toLowerCase().trim()] = price;
+  }
+
+  return { byId, byName };
+}
+
+// ── Price lookup helper ──────────────────────────────────────────────────────
+// Try productId first; fall back to full name match against TCGCSV product names
+function getPrice(prices, card) {
+  if (!prices || (!prices.byId && !prices.byName)) return null;
+  if (card.tcgPlayerId && prices.byId?.[card.tcgPlayerId]) {
+    return prices.byId[card.tcgPlayerId];
+  }
+  if (card.fullName && prices.byName) {
+    // Try exact full name
+    const exact = prices.byName[card.fullName.toLowerCase().trim()];
+    if (exact) return exact;
+    // Try base name only (before the " – " subtitle)
+    const baseName = card.fullName.split(" – ")[0].toLowerCase().trim();
+    return prices.byName[baseName] || null;
+  }
+  return null;
 }
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const INK_COLORS = ["all","Amber","Amethyst","Emerald","Ruby","Sapphire","Steel"];
 
 // Maps TCGCSV group name keywords → LorcanaJSON setNumber
-// so filtering cards by set actually works
 const SET_NAME_TO_NUMBER = {
-  "first chapter": 1,
+  "first chapter":       1,
   "rise of the floodborn": 2,
-  "into the inklands": 3,
-  "ursula's return": 4,
-  "shimmering skies": 5,
-  "azurite sea": 6,
-  "archazia": 7,
+  "into the inklands":   3,
+  "ursula's return":     4,
+  "shimmering skies":    5,
+  "azurite sea":         6,
+  "archazia":            7,
 };
 
 function setNumberFromGroup(groupName) {
@@ -223,7 +273,7 @@ export default function App() {
   const [groups,    setGroups]    = useState([]);
   const [activeSet, setActiveSet] = useState(null);
   const [cards,     setCards]     = useState([]);
-  const [prices,    setPrices]    = useState({});
+  const [prices,    setPrices]    = useState({ byId: {}, byName: {} });
   const [activeInk, setActiveInk] = useState("all");
   const [search,    setSearch]    = useState("");
   const [loading,   setLoading]   = useState(true);
@@ -234,7 +284,6 @@ export default function App() {
     fetchGroups()
       .then(g => {
         setGroups(g);
-        // Prefer "The First Chapter"; fall back to first result
         const best = g.find(x => x.name.toLowerCase().includes("first chapter")) || g[0];
         if (best) setActiveSet(best);
       })
@@ -244,8 +293,17 @@ export default function App() {
   // ── Load ALL cards once ──────────────────────────────────────────────────
   useEffect(() => {
     fetchLorcanaCards()
-      .then(setCards)
-      .catch(() => setCards(PLACEHOLDER_CARDS));
+      .then(data => {
+        setCards(data);
+        // DEBUG: confirm setNumber distribution
+        const setNums = [...new Set(data.map(c => c.setNumber))].sort();
+        console.log("📚 setNumbers in card data:", setNums);
+        console.log("🎨 Sample colors:", [...new Set(data.map(c => c.color))].slice(0, 10));
+      })
+      .catch(err => {
+        console.error("Failed to load cards:", err);
+        setCards(PLACEHOLDER_CARDS);
+      });
   }, []);
 
   // ── Load prices whenever the selected set changes ────────────────────────
@@ -254,8 +312,18 @@ export default function App() {
     setLoading(true);
     setError(null);
     fetchPrices(activeSet.groupId)
-      .then(p => { setPrices(p); setLoading(false); })
-      .catch(() => { setPrices({}); setLoading(false); setError("Could not load prices for this set."); });
+      .then(p => {
+        setPrices(p);
+        setLoading(false);
+        // DEBUG: confirm price join is working
+        console.log(`💰 Prices loaded — byId: ${Object.keys(p.byId).length}, byName: ${Object.keys(p.byName).length}`);
+      })
+      .catch(err => {
+        console.error("Failed to load prices:", err);
+        setPrices({ byId: {}, byName: {} });
+        setLoading(false);
+        setError("Could not load prices for this set.");
+      });
   }, [activeSet]);
 
   // ── Filter cards to the selected set + ink + search ─────────────────────
@@ -270,19 +338,22 @@ export default function App() {
 
   // ── Hot deals: low price ≥10% below market ───────────────────────────────
   const deals = cards.filter(c => {
-    const p = prices[c.tcgPlayerId];
+    const p = getPrice(prices, c);
     return p && p.low && p.market && p.low <= p.market * 0.90;
   }).slice(0, 24);
 
-  const withPrices = Object.keys(prices).length;
+  const withPrices = Object.keys(prices.byId).length;
 
   function CardTile({ c, badge }) {
-    const p = prices[c.tcgPlayerId];
+    const p = getPrice(prices, c);
     const img = c.images?.full || c.images?.thumbnail;
     return (
       <div className="card">
         <div className="card-img-wrap">
-          {img ? <img src={img} alt={c.fullName} loading="lazy" /> : <div className="card-img-placeholder">🃏</div>}
+          {img
+            ? <img src={img} alt={c.fullName} loading="lazy" />
+            : <div className="card-img-placeholder">🃏</div>
+          }
         </div>
         <div className="card-body">
           <div className="card-name">{c.fullName || c.name}</div>
@@ -293,7 +364,10 @@ export default function App() {
           {badge && <span className="deal-badge">🔥 Deal</span>}
           <div className="card-price">
             {p
-              ? <><span className="price-main">${p.market?.toFixed(2) ?? "—"}</span>{p.low && <span className="price-low">Low ${p.low.toFixed(2)}</span>}</>
+              ? <>
+                  <span className="price-main">${p.market?.toFixed(2) ?? "—"}</span>
+                  {p.low && <span className="price-low">Low ${p.low.toFixed(2)}</span>}
+                </>
               : <span className="price-none">Price unavailable</span>
             }
           </div>
@@ -355,7 +429,13 @@ export default function App() {
               {loading
                 ? Array.from({length:12}).map((_,i) => <div key={i} className="skeleton skeleton-card"/>)
                 : filtered.length === 0
-                  ? <div className="empty" style={{gridColumn:"1/-1"}}><h3>No cards found</h3><p>Try a different filter.</p></div>
+                  ? (
+                    <div className="empty" style={{gridColumn:"1/-1"}}>
+                      <h3>No cards found</h3>
+                      {/* DEBUG hint visible on screen during development */}
+                      <p>Try a different filter. (activeSetNumber={String(activeSetNumber)}, cards={cards.length}, filtered={filtered.length})</p>
+                    </div>
+                  )
                   : filtered.map(c => <CardTile key={c.id} c={c}/>)
               }
             </div>
@@ -410,12 +490,12 @@ export default function App() {
 }
 
 const PLACEHOLDER_CARDS = [
-  { id:1, name:"Elsa",         fullName:"Elsa – Snow Queen",                    color:"Amethyst", rarity:"Legendary",  setNumber:1, images:{full:"https://lorcanajson.org/files/current/en/images/large/001-204.jpg"}, tcgPlayerId:100 },
-  { id:2, name:"Mickey Mouse", fullName:"Mickey Mouse – Brave Little Tailor",   color:"Amber",    rarity:"Super Rare", setNumber:1, images:{}, tcgPlayerId:200 },
-  { id:3, name:"Maleficent",   fullName:"Maleficent – Monstrous Dragon",        color:"Emerald",  rarity:"Legendary",  setNumber:1, images:{}, tcgPlayerId:300 },
-  { id:4, name:"Moana",        fullName:"Moana – Of Motunui",                   color:"Ruby",     rarity:"Rare",       setNumber:1, images:{}, tcgPlayerId:400 },
-  { id:5, name:"Simba",        fullName:"Simba – Returned King",                color:"Amber",    rarity:"Super Rare", setNumber:2, images:{}, tcgPlayerId:500 },
-  { id:6, name:"Ursula",       fullName:"Ursula – Eric's Bride",                color:"Amethyst", rarity:"Legendary",  setNumber:2, images:{}, tcgPlayerId:600 },
-  { id:7, name:"Ariel",        fullName:"Ariel – Spectacular Singer",           color:"Ruby",     rarity:"Enchanted",  setNumber:2, images:{}, tcgPlayerId:700 },
-  { id:8, name:"Belle",        fullName:"Belle – Strange but Special",          color:"Sapphire", rarity:"Uncommon",   setNumber:3, images:{}, tcgPlayerId:900 },
+  { id:1, name:"Elsa",         fullName:"Elsa – Snow Queen",                  color:"Amethyst", rarity:"Legendary",  setNumber:1, images:{full:"https://lorcanajson.org/files/current/en/images/large/001-204.jpg"}, tcgPlayerId:100 },
+  { id:2, name:"Mickey Mouse", fullName:"Mickey Mouse – Brave Little Tailor", color:"Amber",    rarity:"Super Rare", setNumber:1, images:{}, tcgPlayerId:200 },
+  { id:3, name:"Maleficent",   fullName:"Maleficent – Monstrous Dragon",      color:"Emerald",  rarity:"Legendary",  setNumber:1, images:{}, tcgPlayerId:300 },
+  { id:4, name:"Moana",        fullName:"Moana – Of Motunui",                 color:"Ruby",     rarity:"Rare",       setNumber:1, images:{}, tcgPlayerId:400 },
+  { id:5, name:"Simba",        fullName:"Simba – Returned King",              color:"Amber",    rarity:"Super Rare", setNumber:2, images:{}, tcgPlayerId:500 },
+  { id:6, name:"Ursula",       fullName:"Ursula – Eric's Bride",              color:"Amethyst", rarity:"Legendary",  setNumber:2, images:{}, tcgPlayerId:600 },
+  { id:7, name:"Ariel",        fullName:"Ariel – Spectacular Singer",         color:"Ruby",     rarity:"Enchanted",  setNumber:2, images:{}, tcgPlayerId:700 },
+  { id:8, name:"Belle",        fullName:"Belle – Strange but Special",        color:"Sapphire", rarity:"Uncommon",   setNumber:3, images:{}, tcgPlayerId:900 },
 ];
